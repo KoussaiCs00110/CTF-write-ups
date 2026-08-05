@@ -38,7 +38,7 @@ The first step is to unzip `users-dir.zip` to examine the victim's file system.
 unzip users-dir.zip
 ```
 
-![Extracting users-dir.zip](pics/Screenshot From 2026-08-04 23-27-28.png)
+![Extracting users-dir.zip](pics/Screenshot_From_2026-08-04_23-27-28.png)
 
 This produces a full Windows-style user profile tree rooted at `Users/serj/`.
 
@@ -69,7 +69,7 @@ Users/serj/
 - **Documents/Memes**: Three markdown files with CTF-themed jokes. No hidden data.
 - **Documents/.obsidian**: A hidden [Obsidian](https://obsidian.md) configuration folder. The `plugins/read-it-later-sync/` subdirectory is the only third-party plugin — and the primary target.
 
-![Plugin files discovered in .obsidian](pics/Screenshot From 2026-08-04 23-48-13.png)
+![Plugin files discovered in .obsidian](pics/Screenshot_From_2026-08-04_23-48-13.png)
 
 ---
 
@@ -164,9 +164,9 @@ const lines  = source.split('\n');
 
 This is a clever self-referential technique: the key is regenerated at runtime from the function body, so it changes if anyone tries to patch the code.
 
-![XOR decryption code — Buffer.from and XOR loop](pics/Screenshot From 2026-08-04 23-50-24.png)
+![XOR decryption code — Buffer.from and XOR loop](pics/Screenshot_From_2026-08-04_23-50-24.png)
 
-![Full syncHelper() function with obfuscated URL construction](pics/Screenshot From 2026-08-04 23-50-54.png)
+![Full syncHelper() function with obfuscated URL construction](pics/Screenshot_From_2026-08-04_23-50-54.png)
 
 #### Stage 6 — Dynamic Code Execution via `vm`
 
@@ -208,7 +208,7 @@ vm.runInContext()  →  arbitrary code execution
 
 Navigating to the decoded URL reveals a private Gist (`description: "oushou"`) containing the hidden `.txt` payload with a base64+XOR-encrypted JavaScript dropper.
 
-![GitHub API response showing the hidden Gist payload](pics/Screenshot From 2026-08-04 23-59-24.png)
+![GitHub API response showing the hidden Gist payload](pics/Screenshot_From_2026-08-04_23-59-24.png)
 
 ---
 
@@ -222,7 +222,7 @@ The key derivation algorithm depends on the exact source text of `syncHelper()`.
 node extracter.js
 ```
 
-![extracter.js output — the derived XOR key bytes](pics/Screenshot From 2026-08-05 00-02-03.png)
+![extracter.js output — the derived XOR key bytes](pics/Screenshot_From_2026-08-05_00-02-03.png)
 
 The output is: `57 8 128 0 26 41 0 88 186 10 190 182 …`
 
@@ -230,7 +230,7 @@ The output is: `57 8 128 0 26 41 0 88 186 10 190 182 …`
 
 Using CyberChef with the **From Base64** and **XOR** operations (key: `153 217 101` in DECIMAL mode, Standard scheme), we decrypt the Gist payload and reveal the second-stage JavaScript:
 
-![CyberChef — From Base64 + XOR decryption revealing the exfiltration script](pics/Screenshot From 2026-08-05 00-03-14.png)
+![CyberChef — From Base64 + XOR decryption revealing the exfiltration script](pics/Screenshot_From_2026-08-05_00-03-14.png)
 
 ---
 
@@ -310,7 +310,7 @@ Running `strings` on the recovered JPEG reveals embedded text:
 strings recovered_document.jpg | head
 ```
 
-![strings output showing the second half of the flag](pics/Screenshot From 2026-08-05 00-24-35.png)
+![strings output showing the second half of the flag](pics/Screenshot_From_2026-08-05_00-24-35.png)
 
 ```
 JFIF
