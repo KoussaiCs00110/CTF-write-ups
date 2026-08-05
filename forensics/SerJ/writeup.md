@@ -2,6 +2,7 @@
 
 | Field      | Value                  |
 |------------|------------------------|
+| **event**     | FLags 2k26          |
 | **Challenge** | SerJ                |
 | **Author**    | L4z3x               |
 | **Category**  | Forensics           |
@@ -413,15 +414,6 @@ js_malware_is_another_world}
 | `python3 solver.py` | Parse PCAP, reassemble chunks, AES-decrypt exfiltrated file |
 | `strings` | Extract flag string from recovered JPEG |
 | `7z` / `7-Zip` | Extract password-protected `chall.7z` |
-
----
-
-## Key Takeaways
-
-- **Plugin supply-chain attacks are realistic.** A malicious Obsidian plugin is indistinguishable from a legitimate one without careful code review.
-- **Multi-layer obfuscation compounds detection difficulty.** The challenge used: Base64 fragment concatenation, reversed strings, character-code encoding, self-referential XOR key derivation, and `vm.runInContext()` for execution — each layer alone is easily missed.
-- **Steganographic covert channels in HTTP headers** (Authorization, User-Agent) are effective for bypassing naive DLP tools that only inspect payload bodies.
-- **AES keys embedded in malware become archive passwords** — a nice challenge design that links the two artefacts together.
 
 ---
 
