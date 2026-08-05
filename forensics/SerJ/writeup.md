@@ -5,7 +5,7 @@
 | **Challenge** | SerJ                |
 | **Author**    | L4z3x               |
 | **Category**  | Forensics           |
-| **Difficulty**| Medium              |
+| **Difficulty**| Medium-hard             |
 | **Flag**      | `itc{oushou_n_takhsayt_??!_YESSSS_js_malware_is_another_world}` |
 
 ---
@@ -266,6 +266,7 @@ const COLLECT_PATH = '/inbox';
          ↓  HTTP GET  →  Authorization: Bearer <chunk>
     http://127.0.0.1:5000/inbox
 ```
+> **Note:** you can read the secript on **solver/secript.js**
 
 ### Steganographic Metadata in User-Agent
 
@@ -352,4 +353,4 @@ js_malware_is_another_world}
 
 ---
 
-*Write-up by the challenge solver. Challenge authored by **L4z3x**.*
+*Write-up by **0xkey** . Challenge authored by **L4z3x**.*
