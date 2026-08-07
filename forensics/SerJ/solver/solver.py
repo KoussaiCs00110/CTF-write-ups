@@ -1,193 +1,142 @@
-
-
 import argparse
 import json
 import re
 import subprocess
-import sys
 import zlib
 from pathlib import Path
-
-ROOT = Path(__file__).resolve().parent
-SCAPY_DIR = ROOT / "scapy"
-if str(SCAPY_DIR) not in sys.path:
-    sys.path.insert(0, str(SCAPY_DIR))
 
 from scapy.all import bind_layers, load_layer, sniff
 from scapy.layers.http import HTTP, HTTPRequest
 from scapy.layers.inet import TCP
 from scapy.sessions import TCPSession
 
-AES_KEY = b"itc{oushou_n_takhsayt_??!_YESSSS"
+
+C2_PORT = 5000
+AES_KEY = b"itc{oushou_n_takhsayt_??!_YESSSS}"
 
 
-def _strip_bearer_token(value):
-    if value is None:
-        return None
+def get_token(value):
     if isinstance(value, bytes):
-        text = value.decode("ascii", "ignore")
-    else:
-        text = str(value)
-    match = re.match(r"Bearer\s+([A-Za-z0-9._-]+)", text)
-    if not match:
-        return None
-    return match.group(1)
+        value = value.decode("ascii", "ignore")
 
+    match = re.match(
+        r"Bearer\s+([A-Za-z0-9.*-]+)",
+        str(value)
+    )
 
+    if match:
+        return match.group(1)
+
+    return None
 def extract_chunks(pcap_file):
     load_layer("http")
-    bind_layers(TCP, HTTP, dport=5000)
-    bind_layers(TCP, HTTP, sport=5000)
+
+    bind_layers(TCP, HTTP, dport=C2_PORT)
+    bind_layers(TCP, HTTP, sport=C2_PORT)
 
     packets = sniff(
         offline=str(pcap_file),
         session=TCPSession,
-        store=True,
+        store=True
     )
 
-    token_parts = []
+    parts = []
+
     for packet in packets:
-        if not packet.haslayer(TCP):
-            continue
-        if not packet.haslayer(HTTPRequest):
-            continue
-        if packet[TCP].dport != 5000:
+
+        if HTTPRequest not in packet:
             continue
 
         request = packet[HTTPRequest]
+
         path = request.getfieldval("Path")
-        if path is None or not path.startswith(b"/inbox"):
+
+        if not path.startswith(b"/inbox"):
             continue
 
         authorization = request.getfieldval("Authorization")
-        token = _strip_bearer_token(authorization)
+
+        token = get_token(authorization)
+
         if token is None:
             continue
 
-        parts = token.split(".")
-        if len(parts) != 3:
+        token_parts = token.split(".")
+
+        if len(token_parts) != 3:
             continue
 
-        token_parts.extend(parts)
+        parts.extend(token_parts)
 
-    if not token_parts:
-        raise ValueError("No chunked Authorization tokens found in the capture")
+    data = "".join(parts)
 
-    encoded = "".join(token_parts)
-    if len(encoded) % 2:
-        raise ValueError(f"Odd-length exfil payload: {len(encoded)}")
+    compressed = bytes.fromhex(data)
 
-    try:
-        compressed = bytes.fromhex(encoded)
-        json_blob = zlib.decompress(compressed)
-    except Exception as error:
-        raise ValueError(f"Failed to reconstruct exfil stream: {error}") from error
+    json_data = zlib.decompress(compressed)
 
-    return json.loads(json_blob)
+    return json.loads(json_data)
 
 
 def decrypt_document(payload):
-    if not isinstance(payload, dict):
-        raise ValueError("Recovered payload is not a JSON object")
 
-    data = payload.get("data")
-    if not isinstance(data, str):
-        raise ValueError("Recovered payload does not contain a hex-encoded data field")
-
-    encrypted = bytes.fromhex(data)
-    if len(encrypted) < 16:
-        raise ValueError("Recovered payload is too short to contain an IV")
+    encrypted = bytes.fromhex(payload["data"])
 
     iv = encrypted[:16]
     ciphertext = encrypted[16:]
-    try:
-        result = subprocess.run(
-            [
-                "openssl",
-                "enc",
-                "-aes-256-cbc",
-                "-d",
-                "-K",
-                AES_KEY.hex(),
-                "-iv",
-                iv.hex(),
-            ],
-            input=ciphertext,
-            capture_output=True,
-            check=False,
-        )
-    except FileNotFoundError as error:
-        raise RuntimeError("OpenSSL is required to decrypt the exfiltrated payload") from error
 
-    if result.returncode != 0:
-        error_text = result.stderr.decode("utf-8", "replace")
-        raise RuntimeError(f"AES decryption failed: {error_text.strip() or result.stdout[:80]!r}")
+    result = subprocess.run(
+        [
+            "openssl",
+            "enc",
+            "-aes-256-cbc",
+            "-d",
+            "-K",
+            AES_KEY.hex(),
+            "-iv",
+            iv.hex()
+        ],
+        input=ciphertext,
+        capture_output=True
+    )
 
     return result.stdout
 
 
-def choose_extension(blob):
-    if blob.startswith(b"\x89PNG\r\n\x1a\n"):
-        return ".png"
-    if blob.startswith(b"\xff\xd8\xff"):
-        return ".jpg"
-    if blob.startswith(b"PK\x03\x04"):
-        return ".zip"
-    if blob.startswith(b"%PDF"):
-        return ".pdf"
-    return ".bin"
-
-
 def main(pcap_file, output_dir):
-    pcap_file = Path(pcap_file)
-    output_dir = Path(output_dir)
 
-    if not pcap_file.exists():
-        print(f"PCAP file not found: {pcap_file}")
-        return 1
+    payload = extract_chunks(pcap_file)
 
-    if not pcap_file.is_file():
-        print(f"PCAP path is not a file: {pcap_file}")
-        return 1
+    recovered = decrypt_document(payload)
 
-    try:
-        payload = extract_chunks(pcap_file)
-        recovered = decrypt_document(payload)
-    except Exception as error:
-        print(f"Failed to read PCAP: {error}")
-        return 1
+    output_dir.mkdir(
+        parents=True,
+        exist_ok=True
+    )
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-    filename = output_dir / f"recovered_document{choose_extension(recovered)}"
-    filename.write_bytes(recovered)
-    print(f"Recovered {filename} ({len(recovered)} bytes)")
-    return 0
+    output_file = output_dir / "recovered_document.bin"
+
+    output_file.write_bytes(recovered)
+
+    print("Recovered:", output_file)
+    print("Size:", len(recovered), "bytes")
 
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
         "pcap",
-        type=Path,
-        help="capture.pcapng",
+        type=Path
     )
 
     parser.add_argument(
-        "--output",
         "-o",
+        "--output",
         type=Path,
-        default=Path("recovered_files"),
-        help="Output directory, default: recovered_files",
+        default=Path("recovered_files")
     )
 
-    arguments = parser.parse_args()
+    args = parser.parse_args()
 
-    raise SystemExit(
-        main(
-            arguments.pcap,
-            arguments.output,
-        )
-    )
-
-
+    main(args.pcap, args.output)
